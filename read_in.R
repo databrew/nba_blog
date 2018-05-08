@@ -125,7 +125,8 @@ for(i in seq(1, nrow(dat_full), 2)) {
 
 # get columns
 dat_game <- dat_full[, c('date','year','month', 'teams','venue', 'opening_odds',
-                         'opening_spread', 'closing_odds','odds', 'real_total', 'f')]
+                         'opening_spread', 'closing_odds','odds', 'real_total', 'f',
+                         'season')]
 
 # where odds variable is na, fill with over_under, else 'the_line'
 dat_game$odds <- ifelse(is.na(dat_game$odds), 'The Over/Under', 'The line')
@@ -154,9 +155,9 @@ dat_game$under_dog_mkt <- ifelse(dat_game$opening_spread < 0, 'favorite',
                              ifelse(dat_game$opening_spread == 0, 'even','underdog'))
 
 # ensure that closing spread has the same sign as opening spread 
-dat_game$closing_spread <- ifelse(dat_game$under_dog =='favorite' & dat_game$closing_spread > 0, 
+dat_game$closing_spread <- ifelse(dat_game$under_dog_mkt =='favorite' & dat_game$closing_spread > 0, 
                                   dat_game$closing_spread*(-1),
-                                  ifelse(dat_game$under_dog == 'underdog' & dat_game$closing_spread < 0,
+                                  ifelse(dat_game$under_dog_mkt == 'underdog' & dat_game$closing_spread < 0,
                                          dat_game$closing_spread*(-1), dat_game$closing_spread))
 
 # get real spread (already have real total for over under)
@@ -179,18 +180,53 @@ for(i in seq(2, nrow(dat_game), 2)){
 # recode f to points_scored
 colnames(dat_game)[colnames(dat_game) == 'f'] <- 'points_scored'
 
-# create variable that represents an absolute value increase and decrease of the opening and closing spread
-dat_game$spread_oc_diff <- abs(dat_game$closing_spread - dat_game$opening_spread)
+# HERE make sure this is correcy
+# create variable that represents an absolute value increaase and decrease of the opening and closing spread
+dat_game$spread_oc_diff <- abs(dat_game$closing_spread) - abs(dat_game$opening_spread)
 dat_game$over_under_oc_diff <- abs(dat_game$closing_over_under) - abs(dat_game$opening_over_under)
 
 # get differences between real and the betting mkt
-dat_game$spread_diff <- abs(dat_game$closing_spread) - abs(dat_game$real_spread)
-dat_game$over_under_diff <- abs(dat_game$closing_over_under) - abs(dat_game$real_total)
+dat_game$spread_diff <- dat_game$closing_spread -dat_game$real_spread
+dat_game$over_under_diff <- dat_game$closing_over_under - dat_game$real_total
+
+# create an abs spread and overunder
+dat_game$spread_diff_abs <- abs(dat_game$spread_diff)
+dat_game$over_under_diff_abs <- abs(dat_game$over_under_diff)
+
 
 # get real outcome
 dat_game$outcome <- ifelse(dat_game$real_spread < 0, 'Winner', 'Loser')
 
+# make a column for right or wrong mkt prediction
+dat_game$mkt_pred <- ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'underdog', 'bad', 
+                            ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'favorite', 'good',
+                                   ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'underdog', 'good',
+                                          ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'favorite', 'bad',
+                                                 ifelse(dat_game$under_dog_mkt == 'even', 'even', 'even')))))
 
+saveRDS(dat_game, 'data/dat_by_team.rda')
+### -------------------------------------------------------------------------------------
+# --- main analysis: ideas
+
+dat <- readRDS('data/dat_by_team.rda')
+
+# groupby team and get mean spread, mean total
+dat_team <- dat %>% 
+  group_by(teams) %>% 
+  summarise(mean_spread_close = mean(closing_spread, na.rm = TRUE),
+                                mean_real_spread = mean(real_spread, na.rm = TRUE),
+                                mean_spread_diff = mean(spread_diff, na.rm = TRUE),
+                                sum_good = sum(mkt_pred == 'good'),
+                                sum_bad = sum(mkt_pred == 'bad'))
+  
+  
+
+# Are we more sure of good teams than bad teams??
+
+# break up by season
+dat_1 <- dat %>% filter(season %in% 'The 2015-2016 Season')
+dat_2 <- dat %>% filter(season %in% 'The 2016-2017 Season')
+dat_3 <- dat %>% filter(season %in% 'The 2017-2018 Season')
 
 
 

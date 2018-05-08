@@ -87,7 +87,7 @@ hist_plot_double <- function(temp_dat, plot_title){
 
 
 # function that plots the over under over time 
-points_plot <- function(temp_dat, smooth_line, plot_title, x_time) {
+points_plot <- function(temp_dat, column_index,smooth_line, plot_title, x_time) {
   
   # revlevel variable if needed
   cols <- c("#A7A7A7",
