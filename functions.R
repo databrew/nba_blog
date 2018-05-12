@@ -16,15 +16,13 @@ get_by_game <- function(dat) {
   # make column names lower case 
   colnames(dat) <- tolower(colnames(dat))
   
-  # create a game identifier 
-  dat$game_number <- rep(1:(nrow(dat)/2), each=2)
   
   temp_new_game <- list()
   
   # loop through by 2 and combine 
-  for(game in unique(dat$game_number)){
+  for(game in unique(dat$game_id)){
     # subset data 
-    temp_game <- dat[dat$game_number == game,]
+    temp_game <- dat[dat$game_id == game,]
     
     # get first and second row
     temp_1st_row <- as.data.frame(temp_game[1,])

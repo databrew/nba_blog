@@ -66,60 +66,6 @@ for(i in seq(1, nrow(dat_full), 2)) {
   print(i)
 }
 
-# make sure that the opening odds and opening totals are consistent with the closing odds and totals.
-# 
-# # make a dataset that has one observation per game, with corresponding features
-# dat_game <- get_by_game(dat_full)
-# 
-# # keep this columns - the opening odds and closing odds are actually the over unders
-# keep_cols <- c('date_home','year_home','month_home' ,'teams_home','teams_away','pts_home', 'pts_away','real_total_home', 'opening_total_home', 'season_home')
-# 
-# # first plot the real total against the line. x axis date, y axis realtotal and over under
-# dat <- dat_game[, keep_cols]
-# 
-# # turn month to character 
-# dat <- dat[order(as.character(dat$month_home), decreasing = F),]
-# dat$month_home <- month.abb[dat$month_home]
-# 
-# # get absolute value difference between real totla and mkt 
-# dat$diff <- dat$real_total_home - dat$opening_total_home
-# 
-# # make data long  
-# dat_long<- melt(dat, id.vars = c('date_home','year_home','month_home', 'teams_home','teams_away','pts_home', 'pts_away', 'season_home', 'diff'))
-# 
-# # rename columns
-# colnames(dat_long) <- c('date', 'year', 'month', 'home_team', 'away_team', 'pts_home', 'pts_away','season', 'diff','variable', 'value')
-# 
-# # -------------------
-# # plot - if discontinuous x axis you can facet_wrap year and have a plot with all data, just no trend or line. 
-# # point, line plot by variable
-# # plot all vm
-# # revlevel variable if needed 
-# dat_long$variable <- ifelse(grepl('real', dat_long$variable), 'Total points scored', 'Betting mkt')
-# dat_long$variable <- factor(dat_long$variable, levels = c('Total points scored', 'Betting mkt'))
-# 
-# points_plot(dat_long, smooth_line = F, plot_title = 'All years',  x_time = 'years')
-# 
-# # break up by season
-# dat_1 <- dat_long %>% filter(season %in% 'The 2015-2016 Season')
-# dat_2 <- dat_long %>% filter(season %in% 'The 2016-2017 Season')
-# dat_3 <- dat_long %>% filter(season %in% 'The 2017-2018 Season')
-# 
-# # plot each season
-# points_plot(dat_1, smooth_line = T, plot_title = '2015-2016 season', x_time = 'months')
-# points_plot(dat_2, smooth_line = T, plot_title = '2016-2017 season',  x_time = 'months')
-# points_plot(dat_3, smooth_line = T, plot_title = '2017-2018 season',  x_time = 'months')
-# 
-# # histogram of each season with double distributions
-# hist_plot_double(dat_1, plot_title = '2015-2016 season')
-# hist_plot_double(dat_2, plot_title = '2016-2017 season') 
-# hist_plot_double(dat_3, plot_title = '2017-2018 season')
-# 
-# # plot each histogram season
-# hist_plot(dat_1, plot_title = '2015-2016 season')
-# hist_plot(dat_2, plot_title = '2015-2016 season')
-# hist_plot(dat_3, plot_title = '2015-2016 season')
-
 # ideas: errors and percent correct.  what teams are most predictable and not. what players? 
 # get variables for looking at team predictability
 
@@ -180,54 +126,96 @@ for(i in seq(2, nrow(dat_game), 2)){
 # recode f to points_scored
 colnames(dat_game)[colnames(dat_game) == 'f'] <- 'points_scored'
 
-# HERE make sure this is correcy
-# create variable that represents an absolute value increaase and decrease of the opening and closing spread
-dat_game$spread_oc_diff <- abs(dat_game$closing_spread) - abs(dat_game$opening_spread)
-dat_game$over_under_oc_diff <- abs(dat_game$closing_over_under) - abs(dat_game$opening_over_under)
+# get game id
+dat_game$game_id <- rep(1:(nrow(dat_game)/2), each=2)
 
-# get differences between real and the betting mkt
-dat_game$spread_diff <- dat_game$closing_spread -dat_game$real_spread
-dat_game$over_under_diff <- dat_game$closing_over_under - dat_game$real_total
+# ------------------------------------------------------------------------------------------------
+# by game analysis
 
-# create an abs spread and overunder
-dat_game$spread_diff_abs <- abs(dat_game$spread_diff)
-dat_game$over_under_diff_abs <- abs(dat_game$over_under_diff)
+# group by game number and get spread diff, spread fac, over under diff, over under fac
+dat_game <- get_by_game(dat_game)
+
+# keep some columns
+dat_game <- dat_game[, c('date_home', 'teams_home', 'teams_away','points_scored_home', 'points_scored_away', 
+                         'opening_over_under_home', 'closing_over_under_home','opening_spread_home', 'closing_spread_home', 'real_total_home')]
 
 
-# get real outcome
-dat_game$outcome <- ifelse(dat_game$real_spread < 0, 'Winner', 'Loser')
-
-# make a column for right or wrong mkt prediction
-dat_game$mkt_pred <- ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'underdog', 'bad', 
-                            ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'favorite', 'good',
-                                   ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'underdog', 'good',
-                                          ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'favorite', 'bad',
-                                                 ifelse(dat_game$under_dog_mkt == 'even', 'even', 'even')))))
-
-saveRDS(dat_game, 'data/dat_by_team.rda')
-### -------------------------------------------------------------------------------------
-# --- main analysis: ideas
-
-dat <- readRDS('data/dat_by_team.rda')
-
-# groupby team and get mean spread, mean total
-dat_team <- dat %>% 
-  group_by(teams) %>% 
-  summarise(mean_spread_close = mean(closing_spread, na.rm = TRUE),
-                                mean_real_spread = mean(real_spread, na.rm = TRUE),
-                                mean_spread_diff = mean(spread_diff, na.rm = TRUE),
-                                sum_good = sum(mkt_pred == 'good'),
-                                sum_bad = sum(mkt_pred == 'bad'))
-  
-  
-
-# Are we more sure of good teams than bad teams??
-
-# break up by season
-dat_1 <- dat %>% filter(season %in% 'The 2015-2016 Season')
-dat_2 <- dat %>% filter(season %in% 'The 2016-2017 Season')
-dat_3 <- dat %>% filter(season %in% 'The 2017-2018 Season')
+ # ------------------------------------------------------------------------------------------------
+# by team analysis
 
 
 
 
+# make a column for spread numeric error
+# make a column for over under right or wrong
+# make a column for over under numeric error
+# -----------------------------------------------------------------------------------------------
+# - older code for visualizing
+
+
+#1)
+# # get real outcome
+# dat_game$outcome <- ifelse(dat_game$real_spread < 0, 'Winner', 'Loser')
+# 
+# # make a column for right or wrong mkt prediction
+# dat_game$win_loss_mkt_pred <- ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'underdog', 'bad', 
+#                                      ifelse(dat_game$outcome == 'Winner' & dat_game$under_dog_mkt == 'favorite', 'good',
+#                                             ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'underdog', 'good',
+#                                                    ifelse(dat_game$outcome == 'Loser' & dat_game$under_dog_mkt == 'favorite', 'bad',
+#                                                           ifelse(dat_game$under_dog_mkt == 'even', 'even', 'even')))))
+
+
+#2)
+# make sure that the opening odds and opening totals are consistent with the closing odds and totals.
+# 
+# # make a dataset that has one observation per game, with corresponding features
+# dat_game <- get_by_game(dat_full)
+# 
+# # keep this columns - the opening odds and closing odds are actually the over unders
+# keep_cols <- c('date_home','year_home','month_home' ,'teams_home','teams_away','pts_home', 'pts_away','real_total_home', 'opening_total_home', 'season_home')
+# 
+# # first plot the real total against the line. x axis date, y axis realtotal and over under
+# dat <- dat_game[, keep_cols]
+# 
+# # turn month to character 
+# dat <- dat[order(as.character(dat$month_home), decreasing = F),]
+# dat$month_home <- month.abb[dat$month_home]
+# 
+# # get absolute value difference between real totla and mkt 
+# dat$diff <- dat$real_total_home - dat$opening_total_home
+# 
+# # make data long  
+# dat_long<- melt(dat, id.vars = c('date_home','year_home','month_home', 'teams_home','teams_away','pts_home', 'pts_away', 'season_home', 'diff'))
+# 
+# # rename columns
+# colnames(dat_long) <- c('date', 'year', 'month', 'home_team', 'away_team', 'pts_home', 'pts_away','season', 'diff','variable', 'value')
+# 
+# # -------------------
+# # plot - if discontinuous x axis you can facet_wrap year and have a plot with all data, just no trend or line. 
+# # point, line plot by variable
+# # plot all vm
+# # revlevel variable if needed 
+# dat_long$variable <- ifelse(grepl('real', dat_long$variable), 'Total points scored', 'Betting mkt')
+# dat_long$variable <- factor(dat_long$variable, levels = c('Total points scored', 'Betting mkt'))
+# 
+# points_plot(dat_long, smooth_line = F, plot_title = 'All years',  x_time = 'years')
+# 
+# # break up by season
+# dat_1 <- dat_long %>% filter(season %in% 'The 2015-2016 Season')
+# dat_2 <- dat_long %>% filter(season %in% 'The 2016-2017 Season')
+# dat_3 <- dat_long %>% filter(season %in% 'The 2017-2018 Season')
+# 
+# # plot each season
+# points_plot(dat_1, smooth_line = T, plot_title = '2015-2016 season', x_time = 'months')
+# points_plot(dat_2, smooth_line = T, plot_title = '2016-2017 season',  x_time = 'months')
+# points_plot(dat_3, smooth_line = T, plot_title = '2017-2018 season',  x_time = 'months')
+# 
+# # histogram of each season with double distributions
+# hist_plot_double(dat_1, plot_title = '2015-2016 season')
+# hist_plot_double(dat_2, plot_title = '2016-2017 season') 
+# hist_plot_double(dat_3, plot_title = '2017-2018 season')
+# 
+# # plot each histogram season
+# hist_plot(dat_1, plot_title = '2015-2016 season')
+# hist_plot(dat_2, plot_title = '2015-2016 season')
+# hist_plot(dat_3, plot_title = '2015-2016 season')
