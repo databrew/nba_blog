@@ -9,6 +9,44 @@ fill_na_zero <- function(data_frame) {
   return(data_frame)
 }
 
+# Get chi squared statistic for each team
+# loop through each team and do chi square on venue and final result
+get_chi_squared <- function(dat_test) {
+  result_list <- list()
+  team_vector <- unique(dat_test$teams)
+  for(i in 1:length(unique(dat_test$teams))) {
+    temp_team <- dat_test[dat_test$teams == team_vector[i],]
+    team_name <- unique(temp_team$teams)
+    team_table <- table(temp_team$venue, temp_team$final_result)
+    team_home_w <- nrow(temp_team[temp_team$venue == 'Home' & temp_team$final_result == 'W',])
+    team_home_l <- nrow(temp_team[temp_team$venue == 'Home' & temp_team$final_result == 'L',])
+    team_away_w <- nrow(temp_team[temp_team$venue == 'Road' & temp_team$final_result == 'W',])
+    team_away_l <- nrow(temp_team[temp_team$venue == 'Road' & temp_team$final_result == 'L',])
+    
+    chi_sqr_test <- chisq.test(team_table, correct = FALSE)
+    temp_tab <- as.data.frame(cbind(team_name, round(chi_sqr_test$statistic,4), round(chi_sqr_test$p.value,4), team_home_w, team_home_l, team_away_w, team_away_l))
+    colnames(temp_tab) <- c('team_name', 'chi_square_statistic', 'p_value', 'home_wins', 'home_losses', 'away_wins', 'away_losses')
+    temp_tab$chi_square_statistic <- as.numeric(as.character(temp_tab$chi_square_statistic))
+    temp_tab$p_value<- as.numeric(as.character(temp_tab$p_value))
+    temp_tab$home_losses <- as.numeric(as.character(temp_tab$home_losses))
+    temp_tab$home_wins <- as.numeric(as.character(temp_tab$home_wins))
+    temp_tab$away_losses <- as.numeric(as.character(temp_tab$away_losses))
+    temp_tab$away_wins <- as.numeric(as.character(temp_tab$away_wins))
+    
+    result_list[[i]] <- temp_tab
+  }
+  
+  # combine list 
+  temp_results <- do.call('rbind', result_list)
+  
+  # order by test stat
+  temp_results <- temp_results[order(temp_results$chi_square_statistic, decreasing = TRUE),]
+  
+  return(temp_results)
+  
+}
+
+
 
 # function that takes every other row and attaches to the dataframe 
 get_by_game <- function(dat) {

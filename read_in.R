@@ -11,6 +11,7 @@ library(glmnet)
 library(reshape2)
 library(plotly)
 library(scales)
+library(MASS)
 registerDoParallel()
 # source functions script 
 source('functions.R')
@@ -108,6 +109,8 @@ dat_game$closing_spread <- ifelse(dat_game$under_dog_mkt =='favorite' & dat_game
 
 # get real spread (already have real total for over under)
 dat_game$real_spread <- NA
+dat_game$final_result <- NA
+
 for(i in seq(2, nrow(dat_game), 2)){
   
   # get new data
@@ -117,6 +120,8 @@ for(i in seq(2, nrow(dat_game), 2)){
   
   temp_dat$real_spread <-ifelse(temp_dat$f == game_max, (game_max - game_min)*(-1),
                                  game_max - game_min)
+  
+  temp_dat$final_result <- ifelse(temp_dat$real_spread < 0, 'W', 'L')
   
   dat_game[i:(i-1),] <- temp_dat
 
@@ -129,26 +134,90 @@ colnames(dat_game)[colnames(dat_game) == 'f'] <- 'points_scored'
 # get game id
 dat_game$game_id <- rep(1:(nrow(dat_game)/2), each=2)
 
+
 # ------------------------------------------------------------------------------------------------
-# by game analysis
+# statistical tests
 
-# group by game number and get spread diff, spread fac, over under diff, over under fac
-dat_game <- get_by_game(dat_game)
+# H0: The The two variables are independent
+# H1: The two variables are related.
+# make contingency table 
+# https://datascienceplus.com/chi-squared-test-in-r/
 
-# keep some columns
-dat_game <- dat_game[, c('date_home', 'teams_home', 'teams_away','points_scored_home', 'points_scored_away', 
-                         'opening_over_under_home', 'closing_over_under_home','opening_spread_home', 'closing_spread_home', 'real_total_home')]
+# first do chi squared test for home away, and win loss
+dat_test <- dat_game[ , c('teams', 'venue', 'final_result')]
+dat_test$final_result <- factor(dat_test$final_result, levels = c('W', 'L'))
+
+table(dat_test$venue, dat_test$final_result)
+
+# apply chi squared function
+temp_chi <- get_chi_squared(dat_test)
+
+# read in fantasy player data
+fan_2017 <- read_csv('data/player_fantasy_2016_2017.csv')
+# read in player data to see mean stats (t test, distributions, etc)
+temp_2016 <- read_csv('data/player_stat_2015_16.csv')
+temp_2017 <- read_csv('data/player_stat_2016_17.csv')
+temp_2018 <- read_csv('data/player_stat_2018_reg.csv')
+
+# combine data
+dat_full <- rbind(temp_2016,
+                  temp_2017,
+                  temp_2018)
 
 
- # ------------------------------------------------------------------------------------------------
-# by team analysis
+# clean and transform data
+names(dat_full) <- tolower(names(dat_full))
+names(dat_full) <- gsub(' ', '_', names(dat_full))
+names(dat_full) <- gsub('_(r/h)', '', names(dat_full), fixed = T)
+
+
+# regression of points on other variables
+dat_mod <- dat_full[, c('pts', 'venue', 'min', 'fga', '3pa', 'fta', 
+                        'or', 'dr', 'a', 'pf', 'st', 'to', 'bl')]
+
+# linear regression
+mod1 <- lm(pts ~ ., data = dat_mod)
+summary(mod1)
+mod_tab1 <- tidy(mod1)
+mod_tab1$sig <- ifelse(mod_tab1$p.value <= 0.05, TRUE, FALSE)
+
+# get Versatility Index Formula=[(PPG)*(RPG)*APG)]^(0.333), 
+# PER: [ FGM x 85.910 + Steals x 53.897 + 3PTM x 51.757 + FTM x 46.845  + Blocks x 39.190 + Offensive_Reb	x 39.190 +
+# Assists	x 34.677 + Defensive_Reb	x 14.707 - Foul x 17.174 - FT_Miss	x 20.091 - FG_Miss	x 39.190 - TO x 53.897 ] x (1 / Minutes).
+dat_full$vi <- ((dat_full$pts)*(dat_full$tot)*(dat_full$a))^(0.333)
+dat_full$per <- ((dat_full$fg*85.91) + (dat_full$st*53.87) + (dat_full$`3p`*51.575) + (dat_full$ft)*46.846 + 
+                  (dat_full$bl*39.190) + (dat_full$or*39.19) + (dat_full$a*34.677) + (dat_full$dr)*14.707 -
+                   (dat_full$pf*17.174) - (dat_full$fta - dat_full$ft)*20.091 - (dat_full$fga - dat_full$fg)*39.19  -
+                     (dat_full$to)*53.897)*(1/dat_full$min)
+dat_full$ppm <- (dat_full$pts/dat_full$min)
+dat_full$ftapm <- (dat_full$fta/dat_full$min)
+
+
+# group by player and get mean and std of pts, 3p, vi, per, ppm, ftapm,minutes, 
+dat_player <- dat_full %>%
+  group_by(player_full_name) %>%
+  summarise(mean_pts = round(mean(pts, na.rm = T), 2),
+            std_pts = round(sd(pts, na.rm = T),2),
+            mean_ppm = round(mean(ppm, na.rm = T),2),
+            std_ppm = round(sd(ppm, na.rm = T),2),
+            mean_per = round(mean(per, na.rm = T),2),
+            std_per = round(sd(per, na.rm = T),2),
+            mean_vi = round(mean(vi, na.rm = T),2),
+            std_vi = round(sd(vi, na.rm = T),2),
+            mean_min = round(mean(min, na.rm = T),2),
+            std_min = round(sd(min, na.rm = T),2),
+            mean_fta = round(mean(fta, na.rm = T),2),
+            std_fta = round(sd(fta, na.rm = T), 2), 
+            games = n())
+
+# visualize distributions
+hist(dat_player$mean_ppm)
+sd(dat_player$mean_pts)
 
 
 
 
-# make a column for spread numeric error
-# make a column for over under right or wrong
-# make a column for over under numeric error
+
 # -----------------------------------------------------------------------------------------------
 # - older code for visualizing
 
