@@ -78,6 +78,22 @@ get_by_game <- function(dat) {
   return(final_game)
 }
 
+# get game number
+get_game_num <- function(temp_dat) {
+  
+  result_list <- list()
+  unique_teams <- unique(temp_dat$TEAMS)
+  
+  for(i in 1:length(unique(temp_dat$TEAMS))){
+    sub_dat <- temp_dat[temp_dat$TEAMS == unique_teams[i],]
+    sub_dat$game_num <- seq(1, nrow(sub_dat), 1)
+    result_list[[i]] <- sub_dat
+  }
+  
+  result_dat <- do.call('rbind', result_list)
+  return(result_dat)
+}
+
 # clean the column names and keep only relevant columns - at this point, just the odds and game outcome. 
 remove_cols <- function(dat, keep_cols) {
   names(dat) <- gsub(' ', '_', names(dat))
