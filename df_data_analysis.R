@@ -58,6 +58,8 @@ names(dat_player) <- gsub(' ', '_', names(dat_player))
 names(dat_player)[5] <- 'teams'
 names(dat_player)[3] <- 'player'
 
+# here is where you need to remove duplicate 
+
 # convert date
 dat_player$date <- as.Date(dat_player$date, format = '%m/%d/%Y')
 
@@ -180,6 +182,10 @@ dat$oeff_player <- dat$pts_player/(dat$fga_player - dat$or_player + dat$to_playe
 # remove playoffs from data
 dat <- dat[!grepl('Playoffs', dat$dataset_team),]
 dat$dataset_team <- NULL
+
+# save data for modeling
+
+saveRDS(dat,'data/dat_mod.rda')
 # -----------
 # for the blog: explore what determines a usage rate, fantasy points, abd salary
 # most underperforming vs overperforming - salary (prior) vs fantasy points (posterior)
