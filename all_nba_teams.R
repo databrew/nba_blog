@@ -41,3 +41,6 @@ names(dat_fan) <- c('data_set', 'date', 'player_name', 'team', 'opp_team', 'star
 
 # combine data set by date and player name and team
 dat <- inner_join(dat_player, dat_fan, by = c('data_set', 'date', 'player_name'))
+
+
+
