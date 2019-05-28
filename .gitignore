@@ -4,6 +4,8 @@
 
 data/*
 data/*.csv
+data/team_data/*
+data/player_data/*
 # Session Data files
 .RData
 
